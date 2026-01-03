@@ -1,0 +1,13 @@
+# Git Repository Targets
+# Confirmed: 2026-01-02
+
+Base Repository: celaya-solutions/codex
+Base Branch: main
+
+Head Repository: celaya-solutions/codex
+Head Branch: claude/main-THd2D
+
+Remote URL: http://127.0.0.1:32019/git/celaya-solutions/codex
+Tracking: origin/claude/main-THd2D
+
+Status: ✓ Correct
