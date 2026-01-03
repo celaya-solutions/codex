@@ -8,53 +8,92 @@ CORA (Cognitive Orchestration Runtime Architecture) integrated into OpenAI Codex
 ```
 cora-mcp/               # MCP server implementation
   src/index.ts          # Server entry point
-  bin/mcp-server.js     # Compiled binary
+  dist/mcp-server.js    # Compiled binary
+cora                    # Python entry point (executable)
+celaya/lmu/             # LMU curriculum runtime
+  generator/            # Lesson generation pipeline
+  runtime/              # Execution engine + mock Ollama
+  grading/              # Lesson grading system
+  artifacts/lessons/    # Generated lesson artifacts
 ```
 
-## Setup
+## Quick Start
+
 ```bash
-# 1. Build CORA MCP
+# 1. Generate lessons (mock mode, no Ollama needed)
+python3 run.py --mock --lessons 0.1
+
+# 2. Run lesson directly
+python3 cora 0.1
+
+# 3. Build MCP server
 cd cora-mcp
 npm install
 npm run build
 
-# 2. Configure Codex
-mkdir -p ~/.codex
-cat >> ~/.codex/config.toml << 'END'
+# 4. Test MCP server
+cd ..
+echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | node cora-mcp/dist/mcp-server.js
+```
 
+## Configure for Claude Desktop / Codex
+
+Add to `~/.codex/config.toml` or Claude Desktop config:
+
+```toml
 [[mcp.servers]]
 name = "cora"
 command = "node"
-args = ["/full/path/to/cora-mcp/bin/mcp-server.js"]
-END
-
-# 3. Build Codex
-cd codex-rs
-cargo build --release
+args = ["/absolute/path/to/codex/cora-mcp/dist/mcp-server.js"]
 ```
 
 ## Usage
-```bash
-# Launch Codex
-./codex-rs/target/release/codex
 
-# Use CORA tool
-> Use cora_learn tool with module "0.1"
+### Direct Python Execution
+```bash
+# List lessons
+python3 cora --list
+
+# Run lesson
+python3 cora 0.1
+```
+
+### MCP Tool Calls
+```
+Tool: cora_learn
+Args: {"lesson_id": "0.1"}
+
+Tool: cora_list
+Args: {}
 ```
 
 ## Status
 
-- ✅ MCP server created
-- ⏳ Codex Rust build needed
-- ⏳ CORA Python script integration
-- ⏳ End-to-end testing
+- ✅ MCP server implemented with @modelcontextprotocol/sdk
+- ✅ CORA Python script working
+- ✅ Lesson execution + receipts
+- ✅ Run.py generation in pipeline
+- ✅ Mock Ollama for CI/CD
+- ⏳ Codex Rust integration testing
+- ⏳ End-to-end MCP flow
 
-## Next Steps
+## Current Capabilities
 
-1. Build Codex binary
-2. Copy CORA script to project root
-3. Test MCP integration
-4. Wire CRT professor UI
+**Generated Artifacts (3/7 per lesson):**
+- ✅ spec.md (CUDA analogy, objectives, constraints)
+- ✅ tasks.json (weighted task breakdown)
+- ✅ run.py (executable lesson script)
+- ⏳ expected_artifacts.json
+- ⏳ grader.md
+- ⏳ Full receipts integration
+- ⏳ Grading automation
+
+**CORA Features:**
+- Lesson display (spec + tasks)
+- Script execution (run.py/run.sh)
+- Receipt emission (JSONL events)
+- Summary collection (status, score, tasks)
+- Grading support (when grader.md exists)
 
 ---
 
