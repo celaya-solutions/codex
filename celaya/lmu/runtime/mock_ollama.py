@@ -66,6 +66,48 @@ LMU operations are analogous to CUDA kernel execution:
 - KV cache = SRAM/HBM memory hierarchy
 """
 
+        elif "expected_artifacts.json" in prompt.lower() or "expected artifacts" in prompt.lower():
+            # GENERATE_EXPECTED_ARTIFACTS_PROMPT
+            return json.dumps({
+                "artifacts": [
+                    {"artifact": "spec.md", "required": True, "weight": 0.15},
+                    {"artifact": "tasks.json", "required": True, "weight": 0.15},
+                    {"artifact": "run.py", "required": True, "weight": 0.15},
+                    {"artifact": "expected_artifacts.json", "required": True, "weight": 0.05},
+                    {"artifact": "grader.md", "required": True, "weight": 0.05},
+                    {"artifact": "receipts.jsonl", "required": True, "weight": 0.20},
+                    {"artifact": "summary.json", "required": True, "weight": 0.25}
+                ]
+            })
+
+        elif "grader.md" in prompt.lower() or "how this lesson is scored" in prompt.lower():
+            # GENERATE_GRADER_PROMPT
+            return """# Organization: Celaya Solutions
+# Lesson Grader
+
+## Artifact Weights
+- spec.md: 15%
+- tasks.json: 15%
+- run.py: 15%
+- expected_artifacts.json: 5%
+- grader.md: 5%
+- receipts.jsonl: 20%
+- summary.json: 25%
+
+## Passing Criteria
+Score ≥ 70% required to pass.
+
+## Partial Credit
+Missing artifacts score 0 for their weight.
+Invalid artifacts score 50% of their weight.
+
+## Receipt Scoring
+Receipts must include: lesson_start, op_start, op_done, lesson_complete.
+
+## Summary Scoring
+Summary.json must include: status, tasks_completed, tasks_total, score.
+"""
+
         elif "run.sh" in prompt.lower() or "run.py" in prompt.lower() or "script" in prompt.lower():
             # GENERATE_RUNNER_PROMPT
             return '''#!/usr/bin/env python3

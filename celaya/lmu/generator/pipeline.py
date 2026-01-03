@@ -283,6 +283,30 @@ class LessonPipeline:
         run_file.chmod(0o755)
         result["artifacts"].append("run.py")
 
+        # Stage 5: Generate expected_artifacts.json
+        expected_artifacts, error = self.generate_expected_artifacts(lesson_plan)
+
+        if error:
+            result["status"] = "failed"
+            result["errors"].append(f"Expected artifacts generation failed: {error}")
+            return result
+
+        # Write expected_artifacts.json
+        (lesson_dir / "expected_artifacts.json").write_text(json.dumps(expected_artifacts, indent=2))
+        result["artifacts"].append("expected_artifacts.json")
+
+        # Stage 6: Generate grader.md
+        grader_content, error = self.generate_grader(lesson_plan, expected_artifacts)
+
+        if error:
+            result["status"] = "failed"
+            result["errors"].append(f"Grader generation failed: {error}")
+            return result
+
+        # Write grader.md
+        (lesson_dir / "grader.md").write_text(grader_content)
+        result["artifacts"].append("grader.md")
+
         result["status"] = "success"
         return result
 
@@ -306,6 +330,50 @@ class LessonPipeline:
         # Return script directly (no JSON extraction needed)
         if len(response.strip()) < 50:
             return None, "Generated script too short"
+
+        return response, None
+
+    def generate_expected_artifacts(
+        self,
+        lesson_plan: Dict[str, Any]
+    ) -> Tuple[Optional[Dict], Optional[str]]:
+        """Generate expected_artifacts.json."""
+        prompt = prompts.format_prompt(
+            prompts.GENERATE_EXPECTED_ARTIFACTS_PROMPT,
+            lesson_plan=json.dumps(lesson_plan, indent=2)
+        )
+
+        try:
+            response = self.ollama.generate(prompt, max_tokens=400, temperature=0.3)
+        except Exception as e:
+            return None, f"Ollama call failed: {e}"
+
+        artifacts, extract_error = extract.extract_json_from_text(response)
+
+        if artifacts is None:
+            return None, f"Failed to extract expected_artifacts: {extract_error}"
+
+        return artifacts, None
+
+    def generate_grader(
+        self,
+        lesson_plan: Dict[str, Any],
+        expected_artifacts: Dict[str, Any]
+    ) -> Tuple[Optional[str], Optional[str]]:
+        """Generate grader.md."""
+        prompt = prompts.format_prompt(
+            prompts.GENERATE_GRADER_PROMPT,
+            lesson_plan=json.dumps(lesson_plan, indent=2),
+            expected_artifacts=json.dumps(expected_artifacts, indent=2)
+        )
+
+        try:
+            response = self.ollama.generate(prompt, max_tokens=600, temperature=0.3)
+        except Exception as e:
+            return None, f"Ollama call failed: {e}"
+
+        if len(response.strip()) < 50:
+            return None, "Generated grader too short"
 
         return response, None
 
