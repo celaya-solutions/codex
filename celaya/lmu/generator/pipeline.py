@@ -269,8 +269,45 @@ class LessonPipeline:
         (lesson_dir / "tasks.json").write_text(json.dumps(tasks, indent=2))
         result["artifacts"].append("tasks.json")
 
+        # Stage 4: Generate run.py
+        run_script, error = self.generate_runner(lesson_plan, tasks)
+
+        if error:
+            result["status"] = "failed"
+            result["errors"].append(f"Runner generation failed: {error}")
+            return result
+
+        # Write run.py and make executable
+        run_file = lesson_dir / "run.py"
+        run_file.write_text(run_script)
+        run_file.chmod(0o755)
+        result["artifacts"].append("run.py")
+
         result["status"] = "success"
         return result
+
+    def generate_runner(
+        self,
+        lesson_plan: Dict[str, Any],
+        tasks: Dict[str, Any]
+    ) -> Tuple[Optional[str], Optional[str]]:
+        """Generate run.py script."""
+        prompt = prompts.format_prompt(
+            prompts.GENERATE_RUNNER_PROMPT,
+            lesson_id="placeholder",
+            tasks=json.dumps(tasks, indent=2)
+        )
+
+        try:
+            response = self.ollama.generate(prompt, max_tokens=600, temperature=0.3)
+        except Exception as e:
+            return None, f"Ollama call failed: {e}"
+
+        # Return script directly (no JSON extraction needed)
+        if len(response.strip()) < 50:
+            return None, "Generated script too short"
+
+        return response, None
 
     def generate_curriculum(
         self,

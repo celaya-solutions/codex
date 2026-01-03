@@ -66,6 +66,38 @@ LMU operations are analogous to CUDA kernel execution:
 - KV cache = SRAM/HBM memory hierarchy
 """
 
+        elif "run.sh" in prompt.lower() or "run.py" in prompt.lower() or "script" in prompt.lower():
+            # GENERATE_RUNNER_PROMPT
+            return '''#!/usr/bin/env python3
+"""Lesson execution script."""
+import json
+from pathlib import Path
+
+def main():
+    print("[Lesson] Executing...")
+
+    # Emit receipts
+    receipts = []
+    receipts.append({"event": "task_start", "task": "concept_mapping"})
+    receipts.append({"event": "task_done", "task": "concept_mapping", "status": "success"})
+
+    Path("receipts.jsonl").write_text("\\n".join(json.dumps(r) for r in receipts) + "\\n")
+
+    # Write summary
+    summary = {
+        "status": "completed",
+        "tasks_completed": 3,
+        "tasks_total": 3,
+        "score": 0.95
+    }
+    Path("summary.json").write_text(json.dumps(summary, indent=2))
+
+    print("[Lesson] Complete")
+
+if __name__ == "__main__":
+    main()
+'''
+
         else:
             # Default fallback
             return json.dumps({

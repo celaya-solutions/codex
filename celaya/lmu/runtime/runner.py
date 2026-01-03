@@ -195,20 +195,20 @@ class LMURunner:
         run_script = None
 
         if (lesson_path / "run.py").exists():
-            run_script = lesson_path / "run.py"
-            command = [sys.executable, str(run_script)]
+            run_script = "run.py"
+            command = [sys.executable, run_script]
         elif (lesson_path / "run.sh").exists():
-            run_script = lesson_path / "run.sh"
-            command = ["bash", str(run_script)]
+            run_script = "run.sh"
+            command = ["bash", run_script]
         else:
             return False, {"error": "No run script found (run.py or run.sh)"}
 
         # Execute lesson script
-        self.receipt_writer.lesson_start(lesson_id, script=str(run_script))
+        self.receipt_writer.lesson_start(lesson_id, script=str(lesson_path / run_script))
 
         success, stdout, stderr = self.run_command(
             command,
-            cwd=str(lesson_path),
+            cwd=str(lesson_path.absolute()),
             op_name=f"lesson_run:{lesson_id}",
             lesson_id=lesson_id
         )
