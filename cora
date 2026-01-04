@@ -1,0 +1,169 @@
+#!/usr/bin/env python3
+"""
+CORA - Cognitive Orchestration Runtime Architecture
+Organization: Celaya Solutions
+Project: LMU Curriculum Runtime
+Version: 0.1.0
+
+Entry point for CORA MCP server integration.
+Executes LMU lessons interactively.
+"""
+
+import sys
+import json
+from pathlib import Path
+from datetime import datetime, timezone
+
+# Add project to path
+sys.path.insert(0, str(Path(__file__).parent))
+
+from celaya.lmu.runtime.runner import LMURunner
+from celaya.lmu.runtime.receipts import ReceiptWriter
+from celaya.lmu.grading.grader import LessonGrader
+
+
+def load_lesson(lesson_id: str) -> dict:
+    """Load lesson from artifacts."""
+    lesson_dir = Path("celaya/lmu/artifacts/lessons") / lesson_id
+
+    if not lesson_dir.exists():
+        return {
+            "error": f"Lesson {lesson_id} not found",
+            "available": list_lessons()
+        }
+
+    lesson = {
+        "id": lesson_id,
+        "path": str(lesson_dir),
+        "artifacts": {}
+    }
+
+    # Load artifacts
+    for artifact in ["spec.md", "tasks.json", "expected_artifacts.json", "grader.md"]:
+        file_path = lesson_dir / artifact
+        if file_path.exists():
+            if artifact.endswith(".json"):
+                lesson["artifacts"][artifact] = json.loads(file_path.read_text())
+            else:
+                lesson["artifacts"][artifact] = file_path.read_text()
+
+    return lesson
+
+
+def list_lessons() -> list:
+    """List available lessons."""
+    lessons_dir = Path("celaya/lmu/artifacts/lessons")
+    if not lessons_dir.exists():
+        return []
+
+    return sorted([d.name for d in lessons_dir.iterdir() if d.is_dir()])
+
+
+def execute_lesson(lesson_id: str) -> dict:
+    """Execute lesson interactively."""
+    receipt_writer = ReceiptWriter()
+    runner = LMURunner()
+
+    # Emit start
+    receipt_writer.lesson_start(lesson_id, mode="cora_interactive")
+
+    # Load lesson
+    lesson = load_lesson(lesson_id)
+
+    if "error" in lesson:
+        receipt_writer.lesson_skip(lesson_id, reason=lesson["error"])
+        return lesson
+
+    # Display lesson info
+    print(f"[CORA] Starting Lesson {lesson_id}")
+    print("=" * 60)
+
+    if "spec.md" in lesson["artifacts"]:
+        print(lesson["artifacts"]["spec.md"])
+        print()
+
+    if "tasks.json" in lesson["artifacts"]:
+        tasks = lesson["artifacts"]["tasks.json"]
+        print("Tasks:")
+        for task in tasks.get("tasks", []):
+            print(f"  - {task['description']} (weight: {task['weight']})")
+        print()
+
+    # Execute lesson script if available
+    lesson_dir = Path(lesson["path"])
+    success = False
+    summary = {}
+
+    if (lesson_dir / "run.py").exists():
+        success, summary = runner.run_lesson_script(str(lesson_dir), lesson_id)
+    elif (lesson_dir / "run.sh").exists():
+        success, summary = runner.run_lesson_script(str(lesson_dir), lesson_id)
+    else:
+        print("[CORA] No executable lesson script found")
+        print("[CORA] Lesson is for reference only")
+        success = True
+        summary = {"status": "reference_only"}
+
+    # Grade if grader exists
+    if success and (lesson_dir / "grader.md").exists():
+        grader = LessonGrader()
+        grade_result = grader.grade_lesson(lesson_id, str(lesson_dir), summary)
+
+        print()
+        print("=" * 60)
+        print(f"Grade: {grade_result['score']:.1%}")
+        print(f"Status: {'PASS' if grade_result['passed'] else 'FAIL'}")
+        print(f"Artifacts: {len(grade_result['artifacts_found'])}/{len(grade_result['breakdown'])}")
+
+        return {
+            "lesson_id": lesson_id,
+            "success": success,
+            "grade": grade_result,
+            "summary": summary
+        }
+
+    return {
+        "lesson_id": lesson_id,
+        "success": success,
+        "summary": summary
+    }
+
+
+def main():
+    """Main entry point for CORA."""
+    if len(sys.argv) < 2:
+        print("[CORA] Usage: cora <lesson_id|--list>")
+        print()
+        print("Available lessons:")
+        for lesson in list_lessons():
+            print(f"  - {lesson}")
+        sys.exit(1)
+
+    command = sys.argv[1]
+
+    if command == "--list":
+        lessons = list_lessons()
+        print(json.dumps({"lessons": lessons}, indent=2))
+        return
+
+    # Execute lesson
+    lesson_id = command
+    result = execute_lesson(lesson_id)
+
+    # Output result as JSON for MCP
+    print()
+    print("=" * 60)
+    print("[CORA] Result:")
+    print(json.dumps(result, indent=2))
+
+    # Exit code
+    if "error" in result:
+        sys.exit(1)
+    elif result.get("success"):
+        sys.exit(0)
+    else:
+        sys.exit(2)
+
+
+if __name__ == "__main__":
+    main()
